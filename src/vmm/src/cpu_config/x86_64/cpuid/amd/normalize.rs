@@ -7,7 +7,7 @@ use crate::cpu_config::x86_64::cpuid::normalize::{
 };
 use crate::cpu_config::x86_64::cpuid::{
     cpuid, cpuid_count, CpuidEntry, CpuidKey, CpuidRegisters, CpuidTrait, KvmCpuidFlags,
-    MissingBrandStringLeaves, BRAND_STRING_LENGTH, VENDOR_ID_AMD,
+    MissingBrandStringLeaves, MissingHypervisorLeaf, BRAND_STRING_LENGTH, VENDOR_ID_AMD,
 };
 
 /// Error type for [`AmdCpuid::normalize`].
@@ -41,6 +41,9 @@ pub enum NormalizeCpuidError {
     /// Failed to set brand string.
     #[error("Failed to set brand string: {0}")]
     BrandString(MissingBrandStringLeaves),
+    /// Failed to set hypervisor bits.
+    #[error("Failed to update hypervisor leaf: {0}")]
+    UpdateHypervisor(MissingHypervisorLeaf),
 }
 
 /// Error type for setting cache topology section of [`AmdCpuid::normalize`].
@@ -131,6 +134,7 @@ impl super::AmdCpuid {
         self.update_extended_cache_topology_entry(cpu_count, cpus_per_core)?;
         self.update_extended_apic_id_entry(cpu_index, cpus_per_core)?;
         self.update_brand_string_entry()?;
+        self.update_hypervisor_entry()?;
 
         Ok(())
     }
@@ -426,6 +430,11 @@ impl super::AmdCpuid {
     fn update_brand_string_entry(&mut self) -> Result<(), NormalizeCpuidError> {
         self.apply_brand_string(Self::DEFAULT_BRAND_STRING)
             .map_err(NormalizeCpuidError::BrandString)?;
+        Ok(())
+    }
+
+    fn update_hypervisor_entry(&mut self) -> Result<(), NormalizeCpuidError> {
+        self.disable_kvm_feature_async_pf().map_err(NormalizeCpuidError::UpdateHypervisor)?;
         Ok(())
     }
 }

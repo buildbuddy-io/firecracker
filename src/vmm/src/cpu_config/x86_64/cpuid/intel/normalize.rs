@@ -6,7 +6,7 @@ use crate::cpu_config::x86_64::cpuid::normalize::{
 };
 use crate::cpu_config::x86_64::cpuid::{
     host_brand_string, CpuidKey, CpuidRegisters, CpuidTrait, MissingBrandStringLeaves,
-    BRAND_STRING_LENGTH,
+    MissingHypervisorLeaf, BRAND_STRING_LENGTH,
 };
 
 /// Error type for [`IntelCpuid::normalize`].
@@ -30,6 +30,9 @@ pub enum NormalizeCpuidError {
     /// Failed to set brand string.
     #[error("Failed to set brand string: {0}")]
     ApplyBrandString(MissingBrandStringLeaves),
+    /// Failed to set hypervisor bits.
+    #[error("Failed to update hypervisor leaf: {0}")]
+    UpdateHypervisor(MissingHypervisorLeaf),
 }
 
 /// Error type for setting leaf 4 section of `IntelCpuid::normalize`.
@@ -91,6 +94,7 @@ impl super::IntelCpuid {
         self.update_extended_feature_flags_entry()?;
         self.update_performance_monitoring_entry()?;
         self.update_brand_string_entry()?;
+        self.update_hypervisor_entry()?;
 
         Ok(())
     }
@@ -241,6 +245,11 @@ impl super::IntelCpuid {
 
         self.apply_brand_string(&default_brand_string)
             .map_err(NormalizeCpuidError::ApplyBrandString)?;
+        Ok(())
+    }
+
+    fn update_hypervisor_entry(&mut self) -> Result<(), NormalizeCpuidError> {
+        self.disable_kvm_feature_async_pf().map_err(NormalizeCpuidError::UpdateHypervisor)?;
         Ok(())
     }
 }
